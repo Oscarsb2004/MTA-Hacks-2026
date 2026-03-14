@@ -42,7 +42,7 @@ const SEED_PEOPLE: Person[] = [
     courseIds: ["math-210"]
   },
   {
-    email: "student@mta.ca",
+    email: "onchuckelbailey@mta.ca",
     name: "Alice Student",
     role: "student",
     courseIds: ["comp-101", "math-210"]
