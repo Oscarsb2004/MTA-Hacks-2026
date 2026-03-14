@@ -146,7 +146,7 @@ The frontend posts JSON:
 Supported action strings currently used by the app:
 - `getPersonByEmail` (email) – lookup for login; returns `Person | null`
 - `getClassesByIds` (classIds) – returns `ClassMembership[]` for display
-- `listClasses`
+- `listClasses` (email)
 - `listPolls`
 - `listPollsForStudent` (courseIds) – returns all polls for enrolled courses
 - `createPoll`
@@ -158,6 +158,28 @@ Supported action strings currently used by the app:
 - `listBookings`
 - `saveAnnouncement`
 - `sendAnnouncementEmail`
+
+### Critical for course dropdown
+
+The teacher course dropdown (e.g. in "Send class announcement") is populated from `listClasses` or, when that returns empty, from `getClassesByIds(myCourses)` where `myCourses` comes from the person's course data. For this to work:
+
+**getPersonByEmail:** The script must return a JSON object that includes either:
+- `courseIds`: array of strings (e.g. `["comp-101", "math-210"]`), or
+- `course1`, `course2`, `course3`, `course4`: string fields from the People sheet.
+
+At least one of these must be present and non-empty for teachers (and students). Example response:
+
+```json
+{
+  "email": "teacher@mta.ca",
+  "name": "Prof. Smith",
+  "role": "teacher",
+  "course1": "comp-101",
+  "course2": "math-210"
+}
+```
+
+**listClasses (email):** Should return an array of class objects for that teacher, each with `classId`, `className`, `teacherEmail` (e.g. from the Classes sheet where `teacherEmail === email`). If implemented and returning rows, the dropdown is filled from here; otherwise the frontend falls back to `getClassesByIds` using the person's course IDs from `getPersonByEmail`.
 
 ## Security and operational notes
 

@@ -54,7 +54,21 @@ export default function App() {
         }
       }
       if (effectiveUser.role === "teacher") {
-        const classMemberships = await dataStore.getClassesByIds(effectiveUser.myCourses);
+        let classMemberships = await dataStore.listClasses(effectiveUser.email);
+        if (classMemberships.length === 0 && effectiveUser.myCourses.length > 0) {
+          classMemberships = await dataStore.getClassesByIds(effectiveUser.myCourses);
+        }
+        if (classMemberships.length === 0) {
+          const person = await dataStore.getPersonByEmail(effectiveUser.email);
+          if (person && person.courseIds.length > 0) {
+            classMemberships = await dataStore.getClassesByIds(person.courseIds);
+            const refreshed = updateSession({ myCourses: person.courseIds });
+            if (refreshed) {
+              effectiveUser = refreshed;
+              setSession(effectiveUser);
+            }
+          }
+        }
         setClasses(classMemberships);
         if (classMemberships.length > 0) {
           const classId = classMemberships[0].classId;
