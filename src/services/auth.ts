@@ -32,3 +32,11 @@ export function signInWithPerson(person: Person): SessionUser {
   localStorage.setItem(SESSION_KEY, JSON.stringify(user));
   return user;
 }
+
+export function updateSession(updates: Partial<SessionUser>): SessionUser | null {
+  const current = getSessionUser();
+  if (!current) return null;
+  const updated = { ...current, ...updates };
+  localStorage.setItem(SESSION_KEY, JSON.stringify(updated));
+  return updated;
+}

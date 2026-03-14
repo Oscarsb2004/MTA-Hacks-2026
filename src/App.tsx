@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { appConfig } from "./config";
 import { addDays, prettyDate, toIso } from "./lib/time";
-import { getSessionUser, signInWithPerson, signOut } from "./services/auth";
+import { getSessionUser, signInWithPerson, signOut, updateSession } from "./services/auth";
 import { createDataStore } from "./services/datastore";
 import { createNotificationSender } from "./services/notifications";
 import type {
@@ -44,8 +44,17 @@ export default function App() {
 
   async function loadCoreData(user: SessionUser): Promise<void> {
     try {
-      if (user.role === "teacher") {
-        const classMemberships = await dataStore.getClassesByIds(user.myCourses);
+      let effectiveUser = user;
+      if (user.myCourses.length === 0) {
+        const person = await dataStore.getPersonByEmail(user.email);
+        if (person && person.courseIds.length > 0) {
+          const refreshed = updateSession({ myCourses: person.courseIds });
+          if (refreshed) effectiveUser = refreshed;
+          setSession(effectiveUser);
+        }
+      }
+      if (effectiveUser.role === "teacher") {
+        const classMemberships = await dataStore.getClassesByIds(effectiveUser.myCourses);
         setClasses(classMemberships);
         if (classMemberships.length > 0) {
           const classId = classMemberships[0].classId;
@@ -60,14 +69,14 @@ export default function App() {
           setBookings(bookingList);
         }
       } else {
-        const pollList = await dataStore.listPollsForStudent(user.myCourses);
+        const pollList = await dataStore.listPollsForStudent(effectiveUser.myCourses);
         setPolls(pollList);
-        setClasses(await dataStore.getClassesByIds(user.myCourses));
-        if (user.myCourses.length > 0) {
-          setActiveClassId(user.myCourses[0]);
+        setClasses(await dataStore.getClassesByIds(effectiveUser.myCourses));
+        if (effectiveUser.myCourses.length > 0) {
+          setActiveClassId(effectiveUser.myCourses[0]);
           const [slotList, bookingList] = await Promise.all([
-            dataStore.listSlots(user.myCourses[0]),
-            dataStore.listBookings(user.myCourses[0])
+            dataStore.listSlots(effectiveUser.myCourses[0]),
+            dataStore.listBookings(effectiveUser.myCourses[0])
           ]);
           setSlots(slotList);
           setBookings(bookingList);

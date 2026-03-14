@@ -42,13 +42,13 @@ const SEED_PEOPLE: Person[] = [
     courseIds: ["math-210"]
   },
   {
-    email: "onschuckelbailey@mta.ca",
+    email: "student@mta.ca",
     name: "Alice Student",
     role: "student",
     courseIds: ["comp-101", "math-210"]
   },
   {
-    email: "edb9093@umoncton.ca",
+    email: "student2@umoncton.ca",
     name: "Bob Student",
     role: "student",
     courseIds: ["comp-101"]
@@ -112,8 +112,18 @@ class LocalDataStore implements DataStore {
   }
 
   async getClassesByIds(classIds: string[]): Promise<ClassMembership[]> {
-    const set = new Set(classIds.map((id) => id.toLowerCase()));
-    return loadState().classes.filter((c) => set.has(c.classId.toLowerCase()));
+    const normalizedIds = classIds.filter(Boolean).map((id) => id.trim());
+    if (normalizedIds.length === 0) return [];
+    const set = new Set(normalizedIds.map((id) => id.toLowerCase()));
+    const found = loadState().classes.filter((c) => set.has(c.classId.toLowerCase()));
+    const foundIds = new Set(found.map((c) => c.classId.toLowerCase()));
+    const missing = normalizedIds.filter((id) => !foundIds.has(id.toLowerCase()));
+    const fallbacks: ClassMembership[] = missing.map((classId) => ({
+      classId,
+      className: classId,
+      teacherEmail: ""
+    }));
+    return [...found, ...fallbacks];
   }
 
   async listClasses(_email: string): Promise<ClassMembership[]> {
