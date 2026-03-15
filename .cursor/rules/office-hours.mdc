@@ -1,66 +1,31 @@
 ---
-description: Project context for Office Hours Planner - key files, data flow, backend contract, and common pitfalls
+description: Project context for Office Hours Booking - key files, data flow, and constraints
 alwaysApply: true
 ---
 
-# Office Hours Planner - Metaprompt
+# Office Hours Booking - Metaprompt
 
-You are helping develop the **Office Hours Planner**: a frontend-only education web app (React + TypeScript + Vite) with Google Sheets (and optional Apps Script) as persistence. Auth is school-email only (`@mta.ca`, `@umoncton.ca`). No custom long-running backend. For full constraints, reasoning order, and deliverables, read [AGENTS.md](AGENTS.md) first.
+You are helping develop the **Office Hours Booking** app: a frontend-only web app (React + TypeScript + Vite) with localStorage as persistence. Auth is email + password for professors and students. No backend required for demo. For full constraints and architecture, read [AGENTS.md](AGENTS.md) first.
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `src/App.tsx` | Root UI, session state, `loadCoreData` (classes/polls/slots/bookings), teacher vs student branches, all main handlers |
-| `src/services/datastore.ts` | `DataStore` interface; `LocalDataStore` (localStorage + seed); `AppsScriptDataStore` (POST to script); `normalizePerson` (sheet row to Person with `courseIds`) |
-| `src/services/auth.ts` | Session (localStorage); `signInWithPerson`, `getSessionUser`, `updateSession`; session has `myCourses` from `person.courseIds` |
-| `src/types.ts` | `Person`, `SessionUser`, `ClassMembership`, `OfficeHoursPoll`, `PollResponse`, etc. |
-| `src/config.ts` | `appConfig`: `allowedDomains`, `appsScriptUrl`, `appName` from env |
-| `src/services/notifications.ts` | `NotificationSender`, `sendAnnouncement`; currently Apps Script or no-op |
+| `src/App.tsx` | Root UI; sign-in (email+password); professor: create course, set availability, dashboard; student: register, scheduler |
+| `src/services/datastore.ts` | LocalDataStore; validateLogin, createCourse, setAvailability, enroll, setPreferences, computeBestTimes |
+| `src/services/auth.ts` | Session (localStorage); signIn(session), getSessionUser, signOut |
+| `src/types.ts` | User, SessionUser, Course, TimeRange, ProfessorAvailability, StudentPreference, Enrollment, BestTimeResult |
+| `src/services/bestTime.ts` | computeBestTimes algorithm: overlap professor + student ranges, best per day |
+| `src/config.ts` | appConfig: appName, allowedDomains (optional) |
 
-## Data Flow (course dropdown, polls)
+## Data Flow
 
-```mermaid
-flowchart LR
-  subgraph auth [Auth]
-    Login[Login with email]
-    Person[getPersonByEmail]
-    Session[SessionUser with myCourses]
-    Login --> Person --> Session
-  end
-  subgraph teacher [Teacher UI]
-    ListClasses[listClasses email]
-    GetByIds[getClassesByIds myCourses]
-    Classes[classes state]
-    ListClasses --> Classes
-    GetByIds --> Classes
-  end
-  subgraph ui [UI]
-    Dropdown[Course dropdown]
-    Classes --> Dropdown
-  end
-  Session --> ListClasses
-  Session --> GetByIds
-```
-
-- **Teachers:** `classes` from `listClasses(effectiveUser.email)`; if empty, fallback `getClassesByIds(effectiveUser.myCourses)`. Backend must support one of: (1) `listClasses(email)` returns that teacher's classes, or (2) `getPersonByEmail` returns `courseIds` or `course1`–`course4` so `myCourses` is set.
-- **Students:** Polls and classes from `listPollsForStudent(myCourses)` and `getClassesByIds(myCourses)`; `Person.courseIds` must be populated.
-- **Normalization:** Apps Script may return `course1`..`course4` instead of `courseIds`. Frontend normalizes in `normalizePerson()` in datastore.ts.
-
-## Backend Contract (Apps Script)
-
-Single POST; body `{ action: string, ...payload }`. Actions: `getPersonByEmail`, `getClassesByIds`, `listClasses`, `listPolls`, `listPollsForStudent`, `createPoll`, `savePollResponse`, `suggestTopConfigs`, `saveOfficeHoursConfig`, `listSlots`, `createBooking`, `listBookings`, `saveAnnouncement`, `sendAnnouncementEmail`.
-
-**Critical for course dropdown:** `getPersonByEmail` must return `courseIds` (array) or `course1`, `course2`, `course3`, `course4` (strings). `listClasses(email)` should return classes where `teacherEmail === email`.
+- **Professors:** create courses → set availability (time ranges per day) → dashboard shows best times per course (auto-refresh every 5s)
+- **Students:** register for courses (dropdown of all courses) → set availability per course via scheduler
+- **Best time:** computed from professor availability + enrolled students' preferences; displayed on professor dashboard
 
 ## Constraints (do not break)
 
-- Auth: only allowed domains; role and courses from Person/Sheets.
-- No long-running backend; persistence is Sheets + optional Apps Script.
-- One notification abstraction; email now, SMS pluggable later.
-- Polls course-scoped; booking = one concrete slot per student; one office-hours poll per course.
-
-## Common Pitfalls
-
-- **Empty course dropdown for teachers:** Usually (1) Apps Script `listClasses(email)` returns `[]` or (2) `getPersonByEmail` does not return `courseIds` or `course1`–`course4`. Fix: ensure script returns course info and/or implements `listClasses` correctly.
-- **LocalDataStore:** `listClasses(email)` filters by `teacherEmail === email`; seed data has `DEFAULT_CLASSES` and `SEED_PEOPLE` with matching `courseIds` / `teacherEmail`.
+- Auth: email + password; users stored in localStorage (seed: teacher@mta.ca, student@mta.ca / password).
+- No backend; persistence is localStorage. Google Sheets planned later.
+- Professor creates courses; students only see courses that exist. Best-time updates as students set preferences.
